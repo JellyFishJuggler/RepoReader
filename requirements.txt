@@ -1,0 +1,7 @@
+GitPython
+python-dotenv
+sentence-transformers
+transformers
+langchain-core
+langchain-huggingface
+langchain-text-splitters
