@@ -10,7 +10,7 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Any repository** — pass a GitHub URL or a local path.
 - **Notebook-aware** — `.ipynb` files are parsed cell-by-cell instead of embedding
@@ -28,7 +28,7 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
                     ┌────────────────────────────────────────────┐
@@ -67,7 +67,7 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 
 ---
 
-## 🔄 How it works
+## How it works
 
 1. **Load** — clone the repository (or open a local folder) and read every
    supported file (`*.py`, `*.js`, `*.ts`, `*.md`, `*.json`, `*.yaml`,
@@ -86,7 +86,7 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 
 ---
 
-## 🚀 Setup
+## Setup
 
 ```bash
 # 1. Create a virtual environment
@@ -109,7 +109,7 @@ cp .env.example .env
 
 ---
 
-## 🖥️ Usage
+## Usage
 
 **Interactive session** (ask as many questions as you want, `exit` to quit):
 
@@ -148,7 +148,7 @@ codebase. Every answer shows its `Sources:` in an expandable panel, and the
 
 ---
 
-## 🧪 Example questions
+## Example questions
 
 Run against `https://github.com/JellyFishJuggler/diabetes-slr.git`:
 
@@ -192,7 +192,7 @@ Sources:
 
 ---
 
-## 🛠️ Tech stack
+## Tech stack
 
 | Layer | Tool |
 |-------|------|
@@ -205,7 +205,7 @@ Sources:
 
 ---
 
-## 📦 Project structure
+## Project structure
 
 ```
 .
@@ -227,7 +227,7 @@ Sources:
 
 ---
 
-## ⚠️ Limitations
+## Limitations
 
 - **Embeddings are re-computed every run** — the index is in-memory and rebuilt
   on each launch. For large repos, starting up takes a bit and a persistent
@@ -241,12 +241,25 @@ Sources:
   but you won't be able to "ask" about a plot.
 - **Top-k file bias** — with small repos and `k=4`, results can include all
   files even when only one is relevant (as seen in the examples above).
+- **Dense-only retrieval misses table-heavy content** — retrieval uses pure
+  semantic (cosine) similarity with no keyword layer or reranking, and
+  markdown tables embed poorly. Queries that name exact metric words
+  ("accuracy", "f1") find the metrics table easily, but abstract phrasings
+  ("how is the model performing?") can rank the right chunk 10th+ and miss
+  the top-`k`. The guardrail then correctly reports `Not found in
+  repository.` — the model only answers from whatever chunks were retrieved.
+  Observed on `JellyFishJuggler/upi-finance-detector`: the metrics chunk
+  ranked #11 for "how is the model performing?" but #1 once reranked with a
+  cross-encoder. A reranking step (or hybrid keyword+dense search) is the
+  planned fix.
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] Persistent vector store (Chroma) — no more re-embedding per run
 - [x] Streamlit UI for a chat web interface
+- [ ] Cross-encoder reranker (retrieve 20 → rerank → top-k) to fix table /
+      phrase-sensitive retrieval recall
 - [ ] `--notebook-outputs` flag to optionally index cell outputs
 - [ ] Follow-up / conversational memory across questions
