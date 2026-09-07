@@ -148,6 +148,40 @@ codebase. Every answer shows its `Sources:` in an expandable panel, and the
 
 ---
 
+## 🌐 Deployment (Streamlit Community Cloud)
+
+The web app reads the Hugging Face token from **Streamlit secrets** — no `.env`
+file exists on the server, and `app/llm.py` resolves the token lazily at the
+first question: OS environment → `st.secrets` → local `.env`.
+
+**Locally**, add a `.streamlit/secrets.toml` file (gitignored):
+
+```toml
+HUGGINGFACEHUB_API_TOKEN = "hf_your_token_here"
+```
+
+A template lives in `.streamlit/secrets.example.toml`.
+
+**On Streamlit Community Cloud**:
+
+1. Push this repository to GitHub.
+2. In the dashboard, click **New app** → choose the repo → main → `streamlit_app.py`.
+3. Under the deployed app, open **Settings → Secrets**.
+4. Paste the same TOML block and save (the value is encrypted):
+
+```toml
+HUGGINGFACEHUB_API_TOKEN = "hf_your_token_here"
+```
+
+The app then has the token available both as an environment variable and via
+`st.secrets`, no code changes needed between local and deployed runs.
+
+> ⚠️ Never commit a real token. `.env`, `.streamlit/secrets.toml` and `streamlit`
+> runtime files are gitignored — only `.env.example` and
+> `.streamlit/secrets.example.toml` (placeholders) are tracked.
+
+---
+
 ## Example questions
 
 Run against `https://github.com/JellyFishJuggler/diabetes-slr.git`:
@@ -214,6 +248,8 @@ Sources:
 ├── requirements.txt
 ├── .env.example         # copy to .env and add your HF token
 ├── .gitignore
+├── .streamlit/
+│   └── secrets.example.toml   # template; copy to secrets.toml locally
 └── app/
     ├── __init__.py
     ├── loader.py        # file discovery + notebook parsing

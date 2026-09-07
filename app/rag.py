@@ -2,7 +2,7 @@ from langchain_core.documents import Document
 from langchain_core.vectorstores import InMemoryVectorStore
 
 from app.chunking import chunk_documents
-from app.llm import chat_model
+from app.llm import get_chat_model
 from app.loader import load_repo
 from app.prompt import build_rag_prompt
 from app.vectorstore import build_index, retrieve
@@ -33,6 +33,6 @@ def ask(vector_store: InMemoryVectorStore, question: str, k: int = 4) -> tuple[s
 
     prompt_template = build_rag_prompt()
     messages = prompt_template.format_messages(context=context, question=question)
-    response = chat_model.invoke(messages)
+    response = get_chat_model().invoke(messages)
 
     return response.content.strip(), sources
