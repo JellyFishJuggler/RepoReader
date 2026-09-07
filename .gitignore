@@ -17,3 +17,5 @@ __pycache__/
 *.log
 .idea/
 .vscode/
+# Agent tooling symlinks (auto-created by streamlit)
+.agents/
