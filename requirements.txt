@@ -5,3 +5,4 @@ transformers
 langchain-core
 langchain-huggingface
 langchain-text-splitters
+streamlit

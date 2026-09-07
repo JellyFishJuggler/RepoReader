@@ -21,6 +21,8 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
   file names it came from.
 - **Interactive or one-shot** — REPL for follow-up questions, or `-q` for a
   single answer (great for scripting).
+- **Web UI** — a Streamlit chat interface (`streamlit_app.py`) for the same
+  pipeline with source attribution and a context `k` slider.
 - **Tiny & fast index** — overlapping 1000-char chunks tagged with their source
   file name; embedded locally with `all-MiniLM-L6-v2` (384-dim).
 
@@ -128,6 +130,16 @@ python main.py -r https://github.com/JellyFishJuggler/diabetes-slr.git \
 python main.py -r ../my-codebase -q "how does the auth middleware work?"
 ```
 
+**Web UI (Streamlit)**:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Enter a repository in the sidebar, click **Load repository**, then chat with the
+codebase. Every answer shows its `Sources:` in an expandable panel, and the
+`k` slider controls how much context reaches the model.
+
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-r, --repo` | GitHub URL or local path (prompts interactively if omitted) | — |
@@ -189,6 +201,7 @@ Sources:
 | Vector store | LangChain `InMemoryVectorStore` |
 | LLM | `meta-llama/Llama-3.3-70B-Instruct` via HF Inference Providers (Together) |
 | Repo access | GitPython |
+| Web UI | Streamlit |
 
 ---
 
@@ -197,6 +210,7 @@ Sources:
 ```
 .
 ├── main.py              # CLI entry point
+├── streamlit_app.py     # Streamlit chat UI
 ├── requirements.txt
 ├── .env.example         # copy to .env and add your HF token
 ├── .gitignore
@@ -233,6 +247,6 @@ Sources:
 ## 🗺️ Roadmap
 
 - [ ] Persistent vector store (Chroma) — no more re-embedding per run
-- [ ] Streamlit UI for a chat web interface
+- [x] Streamlit UI for a chat web interface
 - [ ] `--notebook-outputs` flag to optionally index cell outputs
 - [ ] Follow-up / conversational memory across questions
