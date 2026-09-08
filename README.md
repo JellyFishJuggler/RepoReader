@@ -176,6 +176,16 @@ HUGGINGFACEHUB_API_TOKEN = "hf_your_token_here"
 The app then has the token available both as an environment variable and via
 `st.secrets`, no code changes needed between local and deployed runs.
 
+> **Troubleshooting (deployed)**
+> - The sidebar shows an **"HF token configured"** ✅/❌ indicator — check it on
+>   the deployed app.
+> - Make sure the secret is added to **this app's** Secrets (not a different
+>   project) and that you save — saving triggers a redeploy.
+> - Only `HUGGINGFACEHUB_API_TOKEN`, `HF_TOKEN` or `TOGETHER_API_KEY` are read,
+>   so use one of those names exactly.
+> - If a question errors, the app now shows the real error message inline
+>   (no more redacted `ValueError`).
+
 > ⚠️ Never commit a real token. `.env`, `.streamlit/secrets.toml` and `streamlit`
 > runtime files are gitignored — only `.env.example` and
 > `.streamlit/secrets.example.toml` (placeholders) are tracked.

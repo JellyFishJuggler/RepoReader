@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from app.loader import load_repo
+from app.llm import get_hf_token
 from app.rag import NOT_FOUND, ask, build_vectorstore
 
 load_dotenv()
@@ -51,6 +52,16 @@ with st.sidebar:
     load_repo_btn = st.button("Load repository", type="primary", use_container_width=True)
     k = st.slider("Context chunks (k)", 1, 10, 4, help="How many retrieved chunks are fed to the model.")
     st.divider()
+
+    if get_hf_token():
+        st.sidebar.success("HF token configured")
+    else:
+        st.sidebar.error(
+            "**HF token not found.**\n\n"
+            "On Streamlit Cloud add it under **Settings → Secrets** as "
+            "`HUGGINGFACEHUB_API_TOKEN = \"hf_...\"`. "
+            "Locally, set it in `.env` or `.streamlit/secrets.toml`."
+        )
     st.caption("Answers use `app/rag.py` — the same pipeline as the CLI.")
 
     if st.session_state.get("reader") is not None:
@@ -93,7 +104,11 @@ if question:
 
     with st.chat_message("assistant"):
         with st.spinner("Retrieving and answering..."):
-            answer, sources = ask(st.session_state.reader, question, k=k)
+            try:
+                answer, sources = ask(st.session_state.reader, question, k=k)
+            except Exception as exc:
+                st.error(f"Something went wrong while answering:\n\n{exc}")
+                st.stop()
         st.markdown(answer if answer else NOT_FOUND)
         if sources:
             with st.expander("Sources"):
