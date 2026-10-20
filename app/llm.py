@@ -14,6 +14,39 @@ TOKEN_ENV_NAMES = (
     "TOGETHER_API_KEY",
 )
 
+# Presets for user-supplied (bring-your-own-key) models in the web UI.
+# Everything here is OpenAI-compatible: ChatOpenAI + base_url covers all of them.
+PROVIDER_PRESETS = {
+    "OpenAI": {
+        "base_url": "https://api.openai.com/v1",
+        "default_model": "gpt-4o-mini",
+    },
+    "Together": {
+        "base_url": "https://api.together.xyz/v1",
+        "default_model": "meta-llama/Llama-3.3-70B-Instruct",
+    },
+    "Groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "default_model": "llama-3.3-70b-versatile",
+    },
+    "OpenRouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "default_model": "meta-llama/llama-3.3-70b-instruct",
+    },
+    "DeepSeek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "default_model": "deepseek-chat",
+    },
+    "Hugging Face": {
+        "base_url": "https://api-inference.huggingface.co/models",
+        "default_model": "meta-llama/Llama-3.3-70B-Instruct",
+    },
+    "Custom (OpenAI-compatible)": {
+        "base_url": "",
+        "default_model": "",
+    },
+}
+
 
 def get_hf_token() -> str | None:
     """Resolve the Hugging Face provider token.
@@ -59,10 +92,32 @@ def _read_streamlit_secrets():
         return None
 
 
+def build_user_chat_model(
+    provider: str,
+    model: str,
+    api_key: str,
+    base_url: str | None = None,
+):
+    """Build a chat model from a user-supplied key (bring-your-own-key).
+
+    Uses ChatOpenAI, so any OpenAI-compatible endpoint works — the presets in
+    PROVIDER_PRESETS just pre-fill the right base_url and model name.
+    """
+    from langchain_openai import ChatOpenAI
+
+    return ChatOpenAI(
+        model=model,
+        api_key=api_key,
+        base_url=base_url or None,
+        temperature=0,
+        max_retries=2,
+    )
+
+
 @lru_cache(maxsize=1)
 def get_chat_model() -> ChatHuggingFace:
-    """Build (once) the chat model. Token is resolved at first use so it works
-    on local CLI (.env) and on Streamlit Cloud (secrets) alike.
+    """Build (once) the default chat model. Token is resolved at first use so it
+    works on local CLI (.env) and on Streamlit Cloud (secrets) alike.
 
     Raises a clear, actionable error when no token can be found instead of
     building a broken endpoint.
@@ -73,7 +128,8 @@ def get_chat_model() -> ChatHuggingFace:
             "No Hugging Face token found. "
             "On Streamlit Cloud add it under Settings -> Secrets as:\n"
             '    HUGGINGFACEHUB_API_TOKEN = "hf_..."\n'
-            "Locally, put it in .env or .streamlit/secrets.toml."
+            "Locally, put it in .env or .streamlit/secrets.toml.\n"
+            "Alternatively, add your own API key in the web UI sidebar."
         )
 
     llm = HuggingFaceEndpoint(

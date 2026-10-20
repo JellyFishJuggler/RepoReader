@@ -11,6 +11,11 @@ SUPPORTED_EXTENSIONS = {
 }
 
 
+def is_remote(source: str) -> bool:
+    """True when the source looks like a Git URL rather than a local path."""
+    return source.startswith(("http://", "https://", "git@"))
+
+
 def load_repo(repo_path: Path) -> list[Document]:
     """Load every supported file in a repository as a LangChain Document."""
     documents = []

@@ -13,6 +13,10 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 ## Features
 
 - **Any repository** — pass a GitHub URL or a local path.
+- **Bring your own key** — in the web UI, plug in your own API key for any
+  OpenAI-compatible provider (OpenAI, Together, Groq, OpenRouter, DeepSeek,
+  Hugging Face, or a custom base URL) and pick any model — no server-side
+  token needed.
 - **Notebook-aware** — `.ipynb` files are parsed cell-by-cell instead of embedding
   raw JSON garbage (base64 images, cell ids, rendered HTML).
 - **Hallucination guardrail** — the model is instructed to answer *only* from the
@@ -44,8 +48,8 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
                                           │ top-k similar chunks
                     ┌─────────────────────▼──────────────────────┐
                     │  app/rag.py         build prompt, call LLM │
-                    │  app/llm.py         Llama-3.3-70B via HF   │
-                    │  app/prompt.py      guardrail system prompt│
+                    │  app/llm.py         default HF model or    │
+                    │                     user-supplied key      │
                     └─────────────────────┬──────────────────────┘
                                           │
                                           ▼
@@ -57,13 +61,11 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 | File | Responsibility |
 |------|----------------|
 | `main.py` | CLI entry point — repo handling, interactive loop, output formatting |
-| `app/loader.py` | walks the repo, filters files, extracts notebook cells |
+| `app/loader.py` | walks the repo, filters files, extracts notebook cells, `is_remote()` |
 | `app/chunking.py` | splits documents into overlapping, filename-tagged chunks |
-| `app/embedding.py` | local sentence embedding model (`all-MiniLM-L6-v2`) |
-| `app/vectorstore.py` | embeds chunks once, returns the in-memory vector store |
-| `app/rag.py` | retrieval + generation glue, source attribution |
-| `app/prompt.py` | the "answer only from context" system prompt |
-| `app/llm.py` | `HuggingFaceEndpoint` + `ChatHuggingFace` config |
+| `app/vectorstore.py` | local embedding model + in-memory index & retrieval |
+| `app/rag.py` | retrieval + generation glue, guardrail prompt, source attribution |
+| `app/llm.py` | default HF model config + user-supplied (BYOK) model builder |
 
 ---
 
@@ -139,6 +141,12 @@ streamlit run streamlit_app.py
 Enter a repository in the sidebar, click **Load repository**, then chat with the
 codebase. Every answer shows its `Sources:` in an expandable panel, and the
 `k` slider controls how much context reaches the model.
+
+**Bring your own key** — flip **Use my own API key** in the sidebar to chat
+with any OpenAI-compatible provider (OpenAI, Together, Groq, OpenRouter,
+DeepSeek, Hugging Face, or a custom base URL) without a server-side token.
+Your key stays in the browser session and is only sent to the provider you
+select.
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -262,13 +270,11 @@ Sources:
 │   └── secrets.example.toml   # template; copy to secrets.toml locally
 └── app/
     ├── __init__.py
-    ├── loader.py        # file discovery + notebook parsing
+    ├── loader.py        # file discovery + notebook parsing + is_remote()
     ├── chunking.py      # chunking + filename tags
-    ├── embedding.py     # local embedding model
-    ├── vectorstore.py   # in-memory index + retrieval
-    ├── rag.py           # retrieval + generation glue
-    ├── prompt.py        # guardrail system prompt
-    └── llm.py           # chat model config
+    ├── vectorstore.py   # local embedding model + in-memory index & retrieval
+    ├── rag.py           # retrieval + generation glue + guardrail prompt
+    └── llm.py           # default HF model + user-supplied (BYOK) model builder
 ```
 
 ---
@@ -298,6 +304,30 @@ Sources:
   ranked #11 for "how is the model performing?" but #1 once reranked with a
   cross-encoder. A reranking step (or hybrid keyword+dense search) is the
   planned fix.
+
+---
+
+## Commit conventions & AI-agent usage
+
+Commits in this repo may be authored or assisted by an AI coding agent.
+To keep that visible and filterable, agent-assisted commits end with git
+trailers:
+
+```
+AI-Agent: <tool/model>        e.g. AI-Agent: opencode/big-pickle
+AI-Impact: minor | major      how much of the change the agent produced
+Human-Reviewed: yes | no      whether a human reviewed before commit
+```
+
+List agent-assisted commits:
+
+```bash
+git log --grep="AI-Agent" --oneline
+```
+
+Human-only commits carry no trailers. The convention is advisory — when in
+doubt, add the trailers; they cost nothing and `git shortlog`/`git log
+--grep` stay useful.
 
 ---
 

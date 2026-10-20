@@ -5,13 +5,10 @@ from tempfile import TemporaryDirectory
 from dotenv import load_dotenv
 from git import Repo
 
+from app.loader import is_remote
 from app.rag import NOT_FOUND, ask, build_vectorstore
 
 load_dotenv()
-
-
-def is_remote(source: str) -> bool:
-    return source.startswith(("http://", "https://", "git@"))
 
 
 def open_repo(source: str) -> tuple[Path, object]:

@@ -1,7 +1,12 @@
 from langchain_core.documents import Document
 from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_huggingface import HuggingFaceEmbeddings
 
-from app.embedding import embeddings
+# Local embedding model — no API key or network cost after the first download.
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    encode_kwargs={"normalize_embeddings": True},
+)
 
 
 def build_index(chunks: list[Document]) -> InMemoryVectorStore:

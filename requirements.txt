@@ -4,5 +4,6 @@ sentence-transformers
 transformers
 langchain-core
 langchain-huggingface
+langchain-openai
 langchain-text-splitters
 streamlit

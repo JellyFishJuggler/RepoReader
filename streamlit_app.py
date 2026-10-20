@@ -4,8 +4,8 @@ from git import Repo
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from app.loader import load_repo
-from app.llm import get_hf_token
+from app.loader import is_remote
+from app.llm import PROVIDER_PRESETS, build_user_chat_model, get_hf_token
 from app.rag import NOT_FOUND, ask, build_vectorstore
 
 load_dotenv()
@@ -26,14 +26,16 @@ def get_reader(repo_source: str):
     return store, file_count, chunk_count
 
 
-def is_remote(source: str) -> bool:
-    return source.startswith(("http://", "https://", "git@"))
-
-
 def repo_label(source: str) -> str:
     if is_remote(source):
         return source.rstrip("/").split("/")[-1].removesuffix(".git")
     return Path(source).name
+
+
+@st.cache_resource(show_spinner=False)
+def cached_user_model(provider: str, model: str, api_key: str, base_url: str):
+    """Cache the user-supplied model so it isn't rebuilt on every rerun."""
+    return build_user_chat_model(provider, model, api_key, base_url)
 
 
 st.title("📚 RepoReader")
@@ -53,14 +55,39 @@ with st.sidebar:
     k = st.slider("Context chunks (k)", 1, 10, 4, help="How many retrieved chunks are fed to the model.")
     st.divider()
 
-    if get_hf_token():
-        st.sidebar.success("HF token configured")
+    st.header("Model")
+    use_own_key = st.toggle(
+        "Use my own API key",
+        value=False,
+        help="Bring your own key for any OpenAI-compatible provider. "
+        "The key stays in this session and is sent only to the provider you choose.",
+    )
+
+    user_chat_model = None
+    if use_own_key:
+        provider = st.selectbox("Provider", list(PROVIDER_PRESETS))
+        preset = PROVIDER_PRESETS[provider]
+        if provider == "Custom (OpenAI-compatible)":
+            base_url = st.text_input("Base URL", placeholder="https://example.com/v1")
+        else:
+            base_url = preset["base_url"]
+        model = st.text_input("Model name", value=preset["default_model"])
+        api_key = st.text_input("API key", type="password")
+
+        if api_key and model and (base_url or provider != "Custom (OpenAI-compatible)"):
+            user_chat_model = cached_user_model(provider, model, api_key, base_url)
+            st.success(f"Using **{model}** via {provider}")
+        else:
+            st.info("Fill in your API key (and model name) to activate it.")
+    elif get_hf_token():
+        st.success("HF token configured — using the default model")
     else:
-        st.sidebar.error(
+        st.error(
             "**HF token not found.**\n\n"
             "On Streamlit Cloud add it under **Settings → Secrets** as "
             "`HUGGINGFACEHUB_API_TOKEN = \"hf_...\"`. "
-            "Locally, set it in `.env` or `.streamlit/secrets.toml`."
+            "Locally, set it in `.env` or `.streamlit/secrets.toml`.\n\n"
+            "Or toggle **Use my own API key** above."
         )
     st.caption("Answers use `app/rag.py` — the same pipeline as the CLI.")
 
@@ -105,7 +132,9 @@ if question:
     with st.chat_message("assistant"):
         with st.spinner("Retrieving and answering..."):
             try:
-                answer, sources = ask(st.session_state.reader, question, k=k)
+                answer, sources = ask(
+                    st.session_state.reader, question, k=k, chat_model=user_chat_model
+                )
             except Exception as exc:
                 st.error(f"Something went wrong while answering:\n\n{exc}")
                 st.stop()
