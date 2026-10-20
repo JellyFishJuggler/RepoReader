@@ -13,10 +13,10 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 ## Features
 
 - **Any repository** — pass a GitHub URL or a local path.
-- **Bring your own key** — in the web UI, plug in your own API key for any
-  OpenAI-compatible provider (OpenAI, Together, Groq, OpenRouter, DeepSeek,
-  Hugging Face, or a custom base URL) and pick any model — no server-side
-  token needed.
+- **Four answer sources in the web UI** — pick per question between **Gemini**
+  (key from `.env`), **Ollama** (runs locally, free), **Hugging Face**, or
+  **your own API key** for any OpenAI-compatible endpoint (OpenAI, Groq,
+  OpenRouter, DeepSeek, a local server, …).
 - **Notebook-aware** — `.ipynb` files are parsed cell-by-cell instead of embedding
   raw JSON garbage (base64 images, cell ids, rendered HTML).
 - **Hallucination guardrail** — the model is instructed to answer *only* from the
@@ -65,7 +65,7 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 | `app/chunking.py` | splits documents into overlapping, filename-tagged chunks |
 | `app/vectorstore.py` | local embedding model + in-memory index & retrieval |
 | `app/rag.py` | retrieval + generation glue, guardrail prompt, source attribution |
-| `app/llm.py` | default HF model config + user-supplied (BYOK) model builder |
+| `app/llm.py` | model factories — Gemini, Ollama, HF, any OpenAI-compatible key |
 
 ---
 
@@ -142,11 +142,16 @@ Enter a repository in the sidebar, click **Load repository**, then chat with the
 codebase. Every answer shows its `Sources:` in an expandable panel, and the
 `k` slider controls how much context reaches the model.
 
-**Bring your own key** — flip **Use my own API key** in the sidebar to chat
-with any OpenAI-compatible provider (OpenAI, Together, Groq, OpenRouter,
-DeepSeek, Hugging Face, or a custom base URL) without a server-side token.
-Your key stays in the browser session and is only sent to the provider you
-select.
+**Bring your own model** — the sidebar's **Answer with** picker switches the
+answer source per question:
+
+- **Gemini** — uses `GEMINI_API_KEY` from `.env` (OpenAI-compatible endpoint, no extra dependency).
+- **Ollama** — runs one of your local models for free. `qwen2.5:3b` is the
+  default because it's the smallest and cheapest of the three installed.
+- **Hugging Face** — uses `HUGGINGFACEHUB_API_TOKEN`; needs an account with
+  Inference Providers credits.
+- **My API key** — any OpenAI-compatible base URL + model name + key. The key
+  stays in the browser session and is only sent to the provider you select.
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -274,7 +279,7 @@ Sources:
     ├── chunking.py      # chunking + filename tags
     ├── vectorstore.py   # local embedding model + in-memory index & retrieval
     ├── rag.py           # retrieval + generation glue + guardrail prompt
-    └── llm.py           # default HF model + user-supplied (BYOK) model builder
+    └── llm.py           # model factories: Gemini, Ollama, HF, own key
 ```
 
 ---

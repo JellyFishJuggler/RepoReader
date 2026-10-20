@@ -14,38 +14,18 @@ TOKEN_ENV_NAMES = (
     "TOGETHER_API_KEY",
 )
 
-# Presets for user-supplied (bring-your-own-key) models in the web UI.
-# Everything here is OpenAI-compatible: ChatOpenAI + base_url covers all of them.
-PROVIDER_PRESETS = {
-    "OpenAI": {
-        "base_url": "https://api.openai.com/v1",
-        "default_model": "gpt-4o-mini",
-    },
-    "Together": {
-        "base_url": "https://api.together.xyz/v1",
-        "default_model": "meta-llama/Llama-3.3-70B-Instruct",
-    },
-    "Groq": {
-        "base_url": "https://api.groq.com/openai/v1",
-        "default_model": "llama-3.3-70b-versatile",
-    },
-    "OpenRouter": {
-        "base_url": "https://openrouter.ai/api/v1",
-        "default_model": "meta-llama/llama-3.3-70b-instruct",
-    },
-    "DeepSeek": {
-        "base_url": "https://api.deepseek.com/v1",
-        "default_model": "deepseek-chat",
-    },
-    "Hugging Face": {
-        "base_url": "https://api-inference.huggingface.co/models",
-        "default_model": "meta-llama/Llama-3.3-70B-Instruct",
-    },
-    "Custom (OpenAI-compatible)": {
-        "base_url": "",
-        "default_model": "",
-    },
-}
+# Local Ollama server (OpenAI-compatible endpoint).
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+
+# Cheapest local model — smallest footprint, fastest tokens/sec.
+OLLAMA_DEFAULT_MODEL = "qwen2.5:3b"
+
+# Gemini via its OpenAI-compatible endpoint, so no extra dependency is needed.
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
+
+# The sources offered in the web UI.
+MODEL_SOURCES = ("Gemini", "Ollama", "Hugging Face", "My API key")
 
 
 def get_hf_token() -> str | None:
@@ -82,6 +62,32 @@ def get_hf_token() -> str | None:
     return None
 
 
+def get_gemini_key() -> str | None:
+    """Resolve the Gemini API key from env, st.secrets or .env."""
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        token = os.getenv(name)
+        if token:
+            return token
+
+    secrets = _read_streamlit_secrets()
+    if secrets is not None:
+        for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+            try:
+                token = secrets.get(name) or secrets[name]
+            except Exception:
+                token = None
+            if token:
+                return token
+
+    load_dotenv()
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        token = os.getenv(name)
+        if token:
+            return token
+
+    return None
+
+
 def _read_streamlit_secrets():
     """Return the st.secrets object when running inside Streamlit, else None."""
     try:
@@ -92,16 +98,28 @@ def _read_streamlit_secrets():
         return None
 
 
-def build_user_chat_model(
-    provider: str,
-    model: str,
-    api_key: str,
-    base_url: str | None = None,
-):
-    """Build a chat model from a user-supplied key (bring-your-own-key).
+def list_ollama_models() -> list[str]:
+    """Query the running Ollama server for available models.
 
-    Uses ChatOpenAI, so any OpenAI-compatible endpoint works — the presets in
-    PROVIDER_PRESETS just pre-fill the right base_url and model name.
+    Returns [] when the server isn't reachable so callers can show a helpful
+    message instead of crashing.
+    """
+    import json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{OLLAMA_BASE_URL.rsplit('/', 1)[0]}/api/tags", timeout=5) as resp:
+            data = json.loads(resp.read())
+        return sorted(m["name"] for m in data.get("models", []))
+    except Exception:
+        return []
+
+
+def build_chat_model(model: str, api_key: str, base_url: str | None = None, max_tokens: int | None = None):
+    """Build a chat model over any OpenAI-compatible endpoint.
+
+    Covers Gemini, Ollama and arbitrary providers — they all speak the
+    /chat/completions protocol, so one client is enough.
     """
     from langchain_openai import ChatOpenAI
 
@@ -109,18 +127,40 @@ def build_user_chat_model(
         model=model,
         api_key=api_key,
         base_url=base_url or None,
-        temperature=0,
+        max_tokens=max_tokens,
         max_retries=2,
     )
 
 
+def build_gemini_model(model: str = GEMINI_DEFAULT_MODEL):
+    """Gemini via the .env / secrets key, over Google's OpenAI-compatible endpoint."""
+    key = get_gemini_key()
+    if not key:
+        raise RuntimeError(
+            "No Gemini API key found. Add GEMINI_API_KEY=... to .env "
+            "(or to Streamlit secrets)."
+        )
+    # Gemini's 2.5 models are reasoning models: they spend tokens thinking before
+    # answering, so leave headroom rather than capping low.
+    return build_chat_model(model, api_key=key, base_url=GEMINI_BASE_URL, max_tokens=4096)
+
+
+def build_ollama_model(model: str = OLLAMA_DEFAULT_MODEL):
+    """Local Ollama model. No API key required; a dummy key satisfies the client."""
+    return build_chat_model(model, api_key="ollama", base_url=OLLAMA_BASE_URL, max_tokens=2048)
+
+
 @lru_cache(maxsize=1)
 def get_chat_model() -> ChatHuggingFace:
-    """Build (once) the default chat model. Token is resolved at first use so it
-    works on local CLI (.env) and on Streamlit Cloud (secrets) alike.
+    """Build (once) the default Hugging Face chat model. Token is resolved at
+    first use so it works on local CLI (.env) and on Streamlit Cloud (secrets)
+    alike.
 
     Raises a clear, actionable error when no token can be found instead of
     building a broken endpoint.
+
+    Note: the Hugging Face Inference Providers route needs an account with
+    inference credits enabled — a token without them returns HTTP 402.
     """
     token = get_hf_token()
     if not token:
@@ -129,7 +169,7 @@ def get_chat_model() -> ChatHuggingFace:
             "On Streamlit Cloud add it under Settings -> Secrets as:\n"
             '    HUGGINGFACEHUB_API_TOKEN = "hf_..."\n'
             "Locally, put it in .env or .streamlit/secrets.toml.\n"
-            "Alternatively, add your own API key in the web UI sidebar."
+            "Alternatively, pick Gemini, Ollama, or your own API key in the sidebar."
         )
 
     llm = HuggingFaceEndpoint(
