@@ -1,16 +1,16 @@
 import os
 from functools import lru_cache
-from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-# Resolve .env against the project root, never the current working directory,
-# so the server finds it no matter where it is launched from. `override=True`
-# makes the file authoritative over stale values in the ambient environment.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ENV_PATH = PROJECT_ROOT / ".env"
-load_dotenv(ENV_PATH, override=True)
+from app import config
+
+# Resolve .env against the project root so the file is found regardless of the
+# working directory. Real environment variables win over the file, which is what
+# a hosted deployment needs.
+ENV_PATH = config.ENV_PATH
+load_dotenv(ENV_PATH, override=False)
 
 MODEL_ID = "meta-llama/Llama-3.3-70B-Instruct"
 PROVIDER = "together"
@@ -108,7 +108,19 @@ def build_custom_model(model: str, api_key: str, base_url: str | None = None):
 
 def resolve_model(source: str, model: str | None = None, api_key: str | None = None,
                   base_url: str | None = None):
-    """Build a chat model for the chosen answer source."""
+    """Build a chat model for the chosen answer source.
+
+    When PRODUCTION is on, answers must run on the caller's own key: the server
+    never spends its own quota on a visitor.
+    """
+    if config.is_production():
+        if source != "My API key":
+            raise RuntimeError(
+                "This deployment only answers with your own API key. "
+                "Turn on “Use my own API key” and enter your key."
+            )
+        return build_custom_model(model or "", api_key or "", base_url)
+
     if source == "Gemini":
         return build_gemini_model(model or GEMINI_DEFAULT_MODEL)
     # Ollama support is disabled; kept for re-enable.
@@ -126,6 +138,8 @@ def key_status() -> dict:
     return {
         "gemini": bool(get_gemini_key()),
         "huggingface": bool(get_hf_token()),
+        "production": config.is_production(),
+        "embeddings": config.embeddings_mode(),
         # Ollama support is disabled; kept for re-enable.
         # "ollama_models": list_ollama_models(),
     }
@@ -135,6 +149,8 @@ def log_key_status() -> None:
     """Print which keys were found, without ever printing their values."""
     print(f"[config] .env path        : {ENV_PATH}")
     print(f"[config] .env exists      : {ENV_PATH.exists()}")
+    print(f"[config] production       : {config.is_production()}")
+    print(f"[config] embeddings mode  : {config.embeddings_mode()}")
     for label, names, getter in (
         ("GEMINI_API_KEY", GEMINI_ENV_NAMES, get_gemini_key),
         ("HUGGINGFACEHUB_API_TOKEN", TOKEN_ENV_NAMES, get_hf_token),

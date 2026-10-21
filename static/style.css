@@ -125,6 +125,9 @@ select { cursor: pointer; }
 .source.active { border-color: var(--accent); background: rgba(76,141,255,0.1); }
 .source.unconfigured .dot { background: var(--yellow, #d29922); }
 .source.unconfigured .tag { color: var(--yellow, #d29922); }
+.source.unreachable { opacity: 0.7; cursor: not-allowed; }
+.source.unreachable .dot { background: var(--red); }
+.source.unreachable .tag { color: var(--red); }
 .source .dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--text-dim); flex-shrink: 0;

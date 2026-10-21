@@ -31,11 +31,11 @@ def build_rag_prompt() -> ChatPromptTemplate:
     )
 
 
-def build_vectorstore(repo_path) -> tuple[InMemoryVectorStore, int, int]:
+def build_vectorstore(repo_path, api_key: str | None = None) -> tuple[InMemoryVectorStore, int, int]:
     """Load, chunk and embed a repository. Returns (store, files, chunks)."""
     documents = load_repo(repo_path)
     chunks = chunk_documents(documents)
-    vector_store = build_index(chunks)
+    vector_store = build_index(chunks, api_key=api_key)
     return vector_store, len(documents), len(chunks)
 
 

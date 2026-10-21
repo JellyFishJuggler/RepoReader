@@ -6,6 +6,7 @@ const state = {
   ready: false,
   repo: "",
   status: {},
+  backendDown: false,
 };
 
 const PRESETS = {
@@ -22,8 +23,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadStatus() {
   try {
     state.status = await apiFetch(API.status);
+    state.backendDown = false;
   } catch {
+    // The API itself is unreachable — that is not the same as "no key".
     state.status = {};
+    state.backendDown = true;
   }
   state.source = defaultSource();
   renderSources();
@@ -40,20 +44,40 @@ function defaultSource() {
 
 function renderSources() {
   const s = state.status;
+  const down = state.backendDown;
+  const ownKeyOnly = !!s.production;
   const defs = [
-    { name: "Gemini", tag: "cloud", ready: !!s.gemini },
-    { name: "Hugging Face", tag: "cloud", ready: !!s.huggingface },
+    { name: "Gemini", ready: !!s.gemini },
+    { name: "Hugging Face", ready: !!s.huggingface },
   ];
   const wrap = $("sources");
   wrap.innerHTML = "";
   for (const d of defs) {
     const el = document.createElement("div");
-    el.className = "source" + (d.ready ? " ready" : " unconfigured") +
-                   (d.name === state.source && !state.custom ? " active" : "");
+    let cls = "source";
+    let tag;
+    if (down) {
+      cls += " unreachable";
+      tag = "backend unreachable";
+    } else if (ownKeyOnly) {
+      // The server's own key is never used here, so a configured provider is
+      // still not usable without the visitor's key.
+      cls += " unconfigured";
+      tag = "needs your key";
+    } else if (d.ready) {
+      cls += " ready";
+      tag = "cloud";
+    } else {
+      cls += " unconfigured";
+      tag = "no key";
+    }
+    if (!down && d.name === state.source && !state.custom) cls += " active";
+
+    el.className = cls;
     el.innerHTML = `<span class="dot"></span>
                     <span class="name">${d.name}</span>
-                    <span class="tag">${d.ready ? "cloud" : "no key"}</span>`;
-    el.onclick = () => selectSource(d.name);
+                    <span class="tag">${tag}</span>`;
+    if (!down) el.onclick = () => selectSource(d.name);
     wrap.appendChild(el);
   }
 }
@@ -87,9 +111,25 @@ function updateHint() {
   const hint = $("sourceHint");
   const s = state.status;
   hint.className = "hint";
+
+  if (state.backendDown) {
+    hint.className = "hint warn";
+    hint.textContent = "Backend unreachable — the API is not responding. Is the server running?";
+    return;
+  }
+
   if (state.custom) {
     hint.textContent = "Enter a base URL, model name and key. Works with any OpenAI-compatible API.";
-  } else if (state.source === "Gemini") {
+    return;
+  }
+
+  if (s.production) {
+    hint.className = "hint warn";
+    hint.textContent = "This deployment answers only with your own API key. Turn on the switch above.";
+    return;
+  }
+
+  if (state.source === "Gemini") {
     hint.textContent = s.gemini
       ? "Using GEMINI_API_KEY from your .env."
       : "Add GEMINI_API_KEY=... to .env to use Gemini.";
@@ -116,13 +156,7 @@ function bindEvents() {
   };
 }
 
-const API_BASE = (() => {
-  // Served by the Flask backend (port 5000) → same-origin relative URLs.
-  if (location.port === "5000") return "";
-  // Opened via VS Code Live Server, file://, or any other host → talk to Flask.
-  if (location.protocol.startsWith("http")) return "http://127.0.0.1:5000/";
-  return "http://127.0.0.1:5000/";
-})();
+const API_BASE = location.port === "5500" ? "http://127.0.0.1:5000/" : "";
 
 const API = {
   status: API_BASE + "api/status",
@@ -131,20 +165,41 @@ const API = {
 };
 
 /** POST/GET JSON, tolerating empty or non-JSON bodies instead of throwing a
- *  cryptic "Unexpected end of JSON input". */
+ *  cryptic "Unexpected end of JSON input". Transport failures are tagged so
+ *  the UI can tell "backend unreachable" apart from a server-side rejection. */
 async function apiFetch(url, options) {
-  const res = await fetch(url, options);
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch {
+    const err = new Error("Backend unreachable — could not reach the API.");
+    err.unreachable = true;
+    throw err;
+  }
+
   const text = await res.text();
   let data = {};
   if (text) {
     try {
       data = JSON.parse(text);
     } catch {
-      throw new Error(`Server returned a non-JSON response (HTTP ${res.status}).`);
+      const err = new Error(`Server returned a non-JSON response (HTTP ${res.status}).`);
+      err.unreachable = true;
+      throw err;
     }
   }
   if (!res.ok) throw new Error(data.error || `Request failed (HTTP ${res.status}).`);
   return data;
+}
+
+/** The caller's own key, sent with both indexing and answering. */
+function userKeyPayload() {
+  if (!state.custom) return {};
+  return {
+    api_key: $("apiKey").value.trim(),
+    base_url: $("baseUrl").value.trim(),
+    model: $("customModel").value.trim(),
+  };
 }
 
 async function loadRepo() {
@@ -159,7 +214,7 @@ async function loadRepo() {
     const data = await apiFetch(API.index, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo }),
+      body: JSON.stringify({ repo, ...userKeyPayload() }),
     });
 
     state.repo = repo;
@@ -170,10 +225,20 @@ async function loadRepo() {
     $("question").focus();
     $("emptyState")?.remove();
   } catch (e) {
+    // A 400 means the server is alive and refused the request; anything else
+    // at the transport level means it could not be reached.
+    if (e.unreachable) markBackendDown();
     showRepoStatus(e.message, "err");
   } finally {
     btn.disabled = false;
   }
+}
+
+/** Flip the UI into the "backend unreachable" state after a transport failure. */
+function markBackendDown() {
+  state.backendDown = true;
+  renderSources();
+  updateHint();
 }
 
 function showRepoStatus(msg, cls) {
@@ -235,14 +300,9 @@ async function ask() {
     question,
     k: parseInt($("k").value, 10),
     source: state.custom ? "My API key" : state.source,
+    ...userKeyPayload(),
   };
-  if (state.custom) {
-    body.base_url = $("baseUrl").value.trim();
-    body.model = $("customModel").value.trim();
-    body.api_key = $("apiKey").value.trim();
-  } else {
-    body.model = $("model").value;
-  }
+  if (!state.custom) body.model = $("model").value;
 
   try {
     const data = await apiFetch(API.ask, {
@@ -254,6 +314,7 @@ async function ask() {
     addMessage("assistant", data.answer, data.sources);
   } catch (e) {
     thinking.remove();
+    if (e.unreachable) markBackendDown();
     addError(e.message);
   } finally {
     $("askBtn").disabled = false;
