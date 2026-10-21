@@ -1,10 +1,16 @@
 import os
 from functools import lru_cache
+from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-load_dotenv()
+# Resolve .env against the project root, never the current working directory,
+# so the server finds it no matter where it is launched from. `override=True`
+# makes the file authoritative over stale values in the ambient environment.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = PROJECT_ROOT / ".env"
+load_dotenv(ENV_PATH, override=True)
 
 MODEL_ID = "meta-llama/Llama-3.3-70B-Instruct"
 PROVIDER = "together"
@@ -123,6 +129,19 @@ def key_status() -> dict:
         # Ollama support is disabled; kept for re-enable.
         # "ollama_models": list_ollama_models(),
     }
+
+
+def log_key_status() -> None:
+    """Print which keys were found, without ever printing their values."""
+    print(f"[config] .env path        : {ENV_PATH}")
+    print(f"[config] .env exists      : {ENV_PATH.exists()}")
+    for label, names, getter in (
+        ("GEMINI_API_KEY", GEMINI_ENV_NAMES, get_gemini_key),
+        ("HUGGINGFACEHUB_API_TOKEN", TOKEN_ENV_NAMES, get_hf_token),
+    ):
+        value = getter()
+        source = next((n for n in names if os.getenv(n)), "-")
+        print(f"[config] {label:<24} loaded: {bool(value)}  (via {source}, len {len(value or '')})")
 
 
 @lru_cache(maxsize=1)

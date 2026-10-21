@@ -7,7 +7,7 @@ from threading import Lock
 from flask import Flask, jsonify, request, send_from_directory
 
 from app.loader import is_remote
-from app.llm import key_status, resolve_model
+from app.llm import key_status, log_key_status, resolve_model
 from app.rag import NOT_FOUND, ask, build_vectorstore
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -20,8 +20,11 @@ _stores: dict[str, tuple] = {}
 
 @app.after_request
 def _no_store(response):
-    """Stop the browser from serving stale HTML/JS/CSS after an update."""
+    """Stop the browser serving stale HTML/JS/CSS, and allow cross-origin use."""
     response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
 
@@ -40,6 +43,12 @@ def static_files(filename: str):
 def status():
     """Which providers are configured and available."""
     return jsonify(key_status())
+
+
+@app.route("/api/<path:_any>", methods=["OPTIONS"])
+def api_preflight(_any):
+    """Answer CORS preflight so the UI can be served from another origin."""
+    return ("", 204)
 
 
 def _repo_label(source: str) -> str:
@@ -139,4 +148,5 @@ def api_ask():
 
 
 if __name__ == "__main__":
+    log_key_status()
     app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)

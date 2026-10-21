@@ -116,10 +116,18 @@ function bindEvents() {
   };
 }
 
+const API_BASE = (() => {
+  // Served by the Flask backend (port 5000) → same-origin relative URLs.
+  if (location.port === "5000") return "";
+  // Opened via VS Code Live Server, file://, or any other host → talk to Flask.
+  if (location.protocol.startsWith("http")) return "http://127.0.0.1:5000/";
+  return "http://127.0.0.1:5000/";
+})();
+
 const API = {
-  status: "api/status",
-  index: "api/index",
-  ask: "api/ask",
+  status: API_BASE + "api/status",
+  index: API_BASE + "api/index",
+  ask: API_BASE + "api/ask",
 };
 
 /** POST/GET JSON, tolerating empty or non-JSON bodies instead of throwing a
