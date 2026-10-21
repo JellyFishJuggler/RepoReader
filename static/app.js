@@ -21,16 +21,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadStatus() {
   try {
-    const res = await fetch("/api/status");
-    state.status = await res.json();
+    state.status = await apiFetch(API.status);
   } catch {
     state.status = {};
   }
-  const s = state.status;
-  state.source = s.gemini ? "Gemini" : "Hugging Face";
+  state.source = defaultSource();
   renderSources();
   renderModelPicker();
   updateHint();
+}
+
+/** Keep the chosen source if it's still valid, otherwise default to Gemini. */
+function defaultSource() {
+  const s = state.status;
+  if (state.source === "Gemini" || s.gemini || !s.huggingface) return "Gemini";
+  return state.source;
 }
 
 function renderSources() {
@@ -43,12 +48,12 @@ function renderSources() {
   wrap.innerHTML = "";
   for (const d of defs) {
     const el = document.createElement("div");
-    el.className = "source" + (d.ready ? " ready" : " disabled") +
+    el.className = "source" + (d.ready ? " ready" : " unconfigured") +
                    (d.name === state.source && !state.custom ? " active" : "");
     el.innerHTML = `<span class="dot"></span>
                     <span class="name">${d.name}</span>
-                    <span class="tag">${d.tag}</span>`;
-    if (d.ready) el.onclick = () => selectSource(d.name);
+                    <span class="tag">${d.ready ? "cloud" : "no key"}</span>`;
+    el.onclick = () => selectSource(d.name);
     wrap.appendChild(el);
   }
 }
@@ -111,6 +116,29 @@ function bindEvents() {
   };
 }
 
+const API = {
+  status: "api/status",
+  index: "api/index",
+  ask: "api/ask",
+};
+
+/** POST/GET JSON, tolerating empty or non-JSON bodies instead of throwing a
+ *  cryptic "Unexpected end of JSON input". */
+async function apiFetch(url, options) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`Server returned a non-JSON response (HTTP ${res.status}).`);
+    }
+  }
+  if (!res.ok) throw new Error(data.error || `Request failed (HTTP ${res.status}).`);
+  return data;
+}
+
 async function loadRepo() {
   const repo = $("repo").value.trim();
   if (!repo) return showRepoStatus("Enter a repository URL or path first.", "err");
@@ -120,13 +148,11 @@ async function loadRepo() {
   showRepoStatus("Cloning and indexing… this can take a moment.", "");
 
   try {
-    const res = await fetch("/api/index", {
+    const data = await apiFetch(API.index, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ repo }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to index.");
 
     state.repo = repo;
     state.ready = true;
@@ -211,14 +237,12 @@ async function ask() {
   }
 
   try {
-    const res = await fetch("/api/ask", {
+    const data = await apiFetch(API.ask, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
     thinking.remove();
-    if (!res.ok) throw new Error(data.error || "Failed to answer.");
     addMessage("assistant", data.answer, data.sources);
   } catch (e) {
     thinking.remove();
