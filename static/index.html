@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoReader — ask anything about a repo</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">📚</span>
+        <div>
+          <h1>RepoReader</h1>
+          <p>Ask questions about any repository</p>
+        </div>
+      </div>
+
+      <section class="panel">
+        <h2>Repository</h2>
+        <label for="repo">GitHub URL or local path</label>
+        <input id="repo" type="text" spellcheck="false"
+               placeholder="https://github.com/user/repo.git"
+               value="https://github.com/JellyFishJuggler/diabetes-slr.git" />
+        <button id="loadBtn" class="btn primary">Load repository</button>
+        <div id="repoStatus" class="status"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Answer with</h2>
+        <div id="sources" class="sources"></div>
+
+        <!-- Gemini / Ollama just need a model picker -->
+        <div id="modelRow" class="field">
+          <label for="model">Model</label>
+          <select id="model"></select>
+        </div>
+
+        <!-- "My API key" needs all three -->
+        <div id="customFields" class="hidden">
+          <div class="field">
+            <label for="baseUrl">Base URL</label>
+            <input id="baseUrl" type="text" spellcheck="false"
+                   placeholder="https://api.openai.com/v1" />
+          </div>
+          <div class="field">
+            <label for="customModel">Model name</label>
+            <input id="customModel" type="text" spellcheck="false"
+                   placeholder="gpt-4o-mini" />
+          </div>
+          <div class="field">
+            <label for="apiKey">API key</label>
+            <input id="apiKey" type="password" placeholder="sk-..." />
+          </div>
+        </div>
+
+        <div id="sourceHint" class="hint"></div>
+
+        <div class="field slider-field">
+          <label for="k">Context chunks (k): <span id="kVal">4</span></label>
+          <input id="k" type="range" min="1" max="10" value="4" />
+        </div>
+      </section>
+
+      <button id="clearBtn" class="btn ghost">Clear chat</button>
+      <footer class="foot">Same RAG pipeline as the CLI · <code>app/rag.py</code></footer>
+    </aside>
+
+    <!-- ============ CHAT ============ -->
+    <main class="chat">
+      <div id="messages" class="messages">
+        <div class="empty" id="emptyState">
+          <div class="empty-icon">💬</div>
+          <h3>Load a repository to start</h3>
+          <p>Answers are grounded strictly in the repo — if it isn't in there,
+             you'll get <strong>“Not found in repository.”</strong></p>
+        </div>
+      </div>
+
+      <form id="askForm" class="composer" autocomplete="off">
+        <input id="question" type="text"
+               placeholder="Ask something about the repository…"
+               disabled />
+        <button id="askBtn" type="submit" class="btn primary" disabled>Ask</button>
+      </form>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

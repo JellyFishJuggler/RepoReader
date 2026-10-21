@@ -25,8 +25,9 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
   file names it came from.
 - **Interactive or one-shot** — REPL for follow-up questions, or `-q` for a
   single answer (great for scripting).
-- **Web UI** — a Streamlit chat interface (`streamlit_app.py`) for the same
-  pipeline with source attribution and a context `k` slider.
+- **Web UI** — a plain HTML/CSS/JS frontend (`server.py` + `static/`) for the
+  same pipeline with source attribution and a context `k` slider. No framework,
+  no build step.
 - **Tiny & fast index** — overlapping 1000-char chunks tagged with their source
   file name; embedded locally with `all-MiniLM-L6-v2` (384-dim).
 
@@ -132,26 +133,26 @@ python main.py -r https://github.com/JellyFishJuggler/diabetes-slr.git \
 python main.py -r ../my-codebase -q "how does the auth middleware work?"
 ```
 
-**Web UI (Streamlit)**:
+**Web UI**:
 
 ```bash
-streamlit run streamlit_app.py
+python server.py
+# then open http://localhost:5000
 ```
 
-Enter a repository in the sidebar, click **Load repository**, then chat with the
-codebase. Every answer shows its `Sources:` in an expandable panel, and the
-`k` slider controls how much context reaches the model.
+Enter a repository, click **Load repository**, then chat with the codebase.
+Every answer shows its sources in an expandable panel, and the `k` slider
+controls how much context reaches the model.
 
-**Bring your own model** — the sidebar's **Answer with** picker switches the
-answer source per question:
+**Choose your answer source** — the sidebar's **Answer with** picker switches
+the model per question:
 
 - **Gemini** — uses `GEMINI_API_KEY` from `.env` (OpenAI-compatible endpoint, no extra dependency).
 - **Ollama** — runs one of your local models for free. `qwen2.5:3b` is the
-  default because it's the smallest and cheapest of the three installed.
+  default because it's the smallest and cheapest of the installed models.
 - **Hugging Face** — uses `HUGGINGFACEHUB_API_TOKEN`; needs an account with
   Inference Providers credits.
-- **My API key** — any OpenAI-compatible base URL + model name + key. The key
-  stays in the browser session and is only sent to the provider you select.
+- **My API key** — any OpenAI-compatible base URL + model name + key.
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -161,47 +162,29 @@ answer source per question:
 
 ---
 
-## 🌐 Deployment (Streamlit Community Cloud)
+## 🌐 Running the web UI
 
-The web app reads the Hugging Face token from **Streamlit secrets** — no `.env`
-file exists on the server, and `app/llm.py` resolves the token lazily at the
-first question: OS environment → `st.secrets` → local `.env`.
+The web UI is a small Flask server (`server.py`) serving static files from
+`static/` and a three-endpoint JSON API. It reads every key straight from
+`.env` via `python-dotenv` — no secrets layer, no special hosting required.
 
-**Locally**, add a `.streamlit/secrets.toml` file (gitignored):
-
-```toml
-HUGGINGFACEHUB_API_TOKEN = "hf_your_token_here"
+```bash
+python server.py
+# → http://localhost:5000
 ```
 
-A template lives in `.streamlit/secrets.example.toml`.
+**API**, if you want to drive it from scripts or another frontend:
 
-**On Streamlit Community Cloud**:
+| Method | Path | Body | Returns |
+|--------|------|------|---------|
+| `GET`  | `/api/status` | — | which providers are configured + available Ollama models |
+| `POST` | `/api/index` | `{"repo": "<url or path>"}` | file/chunk counts |
+| `POST` | `/api/ask` | `{"repo", "question", "k", "source", "model", ...}` | `{"answer", "sources", "found"}` |
 
-1. Push this repository to GitHub.
-2. In the dashboard, click **New app** → choose the repo → main → `streamlit_app.py`.
-3. Under the deployed app, open **Settings → Secrets**.
-4. Paste the same TOML block and save (the value is encrypted):
+Set the port with `FLASK_RUN_PORT` or edit `server.py`; the default is `5000`.
 
-```toml
-HUGGINGFACEHUB_API_TOKEN = "hf_your_token_here"
-```
-
-The app then has the token available both as an environment variable and via
-`st.secrets`, no code changes needed between local and deployed runs.
-
-> **Troubleshooting (deployed)**
-> - The sidebar shows an **"HF token configured"** ✅/❌ indicator — check it on
->   the deployed app.
-> - Make sure the secret is added to **this app's** Secrets (not a different
->   project) and that you save — saving triggers a redeploy.
-> - Only `HUGGINGFACEHUB_API_TOKEN`, `HF_TOKEN` or `TOGETHER_API_KEY` are read,
->   so use one of those names exactly.
-> - If a question errors, the app now shows the real error message inline
->   (no more redacted `ValueError`).
-
-> ⚠️ Never commit a real token. `.env`, `.streamlit/secrets.toml` and `streamlit`
-> runtime files are gitignored — only `.env.example` and
-> `.streamlit/secrets.example.toml` (placeholders) are tracked.
+> ⚠️ Never commit a real token. `.env` is gitignored — only `.env.example`
+> (placeholders) is tracked.
 
 ---
 
@@ -258,7 +241,7 @@ Sources:
 | Vector store | LangChain `InMemoryVectorStore` |
 | LLM | `meta-llama/Llama-3.3-70B-Instruct` via HF Inference Providers (Together) |
 | Repo access | GitPython |
-| Web UI | Streamlit |
+| Web UI | Plain HTML/CSS/JS + Flask |
 
 ---
 
@@ -267,12 +250,14 @@ Sources:
 ```
 .
 ├── main.py              # CLI entry point
-├── streamlit_app.py     # Streamlit chat UI
+├── server.py            # Flask API + static file server for the web UI
+├── static/              # frontend (no framework, no build step)
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
 ├── requirements.txt
-├── .env.example         # copy to .env and add your HF token
+├── .env.example         # copy to .env and add your keys
 ├── .gitignore
-├── .streamlit/
-│   └── secrets.example.toml   # template; copy to secrets.toml locally
 └── app/
     ├── __init__.py
     ├── loader.py        # file discovery + notebook parsing + is_remote()
@@ -339,7 +324,7 @@ doubt, add the trailers; they cost nothing and `git shortlog`/`git log
 ## Roadmap
 
 - [ ] Persistent vector store (Chroma) — no more re-embedding per run
-- [x] Streamlit UI for a chat web interface
+- [x] Web UI for a chat interface (plain HTML/CSS/JS + Flask)
 - [ ] Cross-encoder reranker (retrieve 20 → rerank → top-k) to fix table /
       phrase-sensitive retrieval recall
 - [ ] `--notebook-outputs` flag to optionally index cell outputs
