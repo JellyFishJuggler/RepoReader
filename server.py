@@ -16,6 +16,13 @@ _store_lock = Lock()
 _stores: dict[str, tuple] = {}
 
 
+@app.after_request
+def _no_store(response):
+    """Stop the browser from serving stale HTML/JS/CSS after an update."""
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
+
+
 @app.get("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
