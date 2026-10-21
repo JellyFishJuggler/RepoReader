@@ -1,0 +1,16 @@
+# Development dependencies: the torch-based local embedding stack.
+#
+# Install this instead of requirements.txt when running the app locally with
+# EMBEDDINGS=local (the default outside production), which uses MiniLM via
+# sentence-transformers. It is intentionally not part of requirements.txt, so
+# the deployed service installs neither torch nor these packages.
+#
+#   pip install -r requirements-dev.txt
+#
+# langchain-huggingface declares sentence-transformers and transformers only
+# under its "full" extra, so they are pinned directly here.
+-r requirements.txt
+
+sentence-transformers==6.1.0
+transformers==5.20.2
+torch==2.14.1

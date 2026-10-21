@@ -1,8 +1,8 @@
-# RepoReader dependencies.
+# Production dependencies.
 #
-# Installs everything the app needs for both embedding backends:
-#   EMBEDDINGS=local -> sentence-transformers + torch (MiniLM, runs on CPU)
-#   EMBEDDINGS=api   -> Gemini over REST, no torch needed but installed anyway
+# The deployed service runs with EMBEDDINGS=api, so the torch-based local
+# embedding stack is deliberately absent here. Install requirements-dev.txt
+# instead to run the app locally with EMBEDDINGS=local (the default).
 #
 # numpy is pinned explicitly: langchain-core's InMemoryVectorStore imports it
 # only as an optional dependency (try/except ImportError) and raises at query
@@ -17,9 +17,3 @@ langchain-core==1.6.12
 langchain-huggingface==1.2.3
 langchain-openai==1.7.2
 langchain-text-splitters==1.1.3
-
-# Local (torch) embedding stack. langchain-huggingface only pulls these under
-# its "full" extra, so they are declared directly.
-sentence-transformers==6.1.0
-transformers==5.20.2
-torch==2.14.1
