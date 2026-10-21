@@ -7,12 +7,7 @@ def chunk_documents(
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
 ) -> list[Document]:
-    """Split documents into overlapping chunks and tag each with its source file.
-
-    The `[filename: ...]` prefix is embedded along with the text so that
-    queries mentioning a file name (e.g. "what does the README say?") match
-    the right chunks.
-    """
+    """Split documents into overlapping chunks, tagged with their source file."""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,

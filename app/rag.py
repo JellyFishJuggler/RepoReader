@@ -47,9 +47,6 @@ def ask(
 ) -> tuple[str, list[str]]:
     """Retrieve the top-k chunks and generate an answer grounded in them.
 
-    `chat_model` optionally overrides the default Hugging Face model (e.g. a
-    user-supplied bring-your-own-key model from the web UI).
-
     Returns (answer_text, sources) where sources is the sorted list of file
     names the answer was built from.
     """

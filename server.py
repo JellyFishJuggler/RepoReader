@@ -1,13 +1,4 @@
-"""RepoReader web server — a thin Flask API over the same RAG pipeline the CLI uses.
-
-Serves the static frontend in `static/` and exposes three endpoints:
-
-    GET  /api/status   which providers are configured + available Ollama models
-    POST /api/index    clone/load a repo and build the vector store
-    POST /api/ask      answer a question against an already-indexed repo
-
-Run it with:  python server.py   (then open http://localhost:5000)
-"""
+"""RepoReader web server: a thin Flask API over the same RAG pipeline the CLI uses."""
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -21,9 +12,6 @@ from app.rag import NOT_FOUND, ask, build_vectorstore
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
-# One vector store per repo source, shared across requests. The lock guards
-# both the dict and the (slow) build so two concurrent loads of the same repo
-# don't both pay the indexing cost.
 _store_lock = Lock()
 _stores: dict[str, tuple] = {}
 
@@ -35,7 +23,7 @@ def index():
 
 @app.get("/api/status")
 def status():
-    """Tell the frontend which providers it can actually use right now."""
+    """Which providers are configured and available."""
     return jsonify(key_status())
 
 
@@ -79,7 +67,7 @@ def api_index():
 
     try:
         store, file_count, chunk_count, label = _get_or_build_store(repo_source)
-    except Exception as exc:  # clone failures, bad paths, empty repos...
+    except Exception as exc:
         return jsonify(error=f"Could not load repository: {exc}"), 400
 
     return jsonify(
@@ -93,11 +81,7 @@ def api_index():
 
 @app.post("/api/ask")
 def api_ask():
-    """Answer a question.
-
-    Body: {"repo": ..., "question": ..., "k": 4,
-           "source": "Gemini", "model": ..., "api_key": ..., "base_url": ...}
-    """
+    """Answer a question against an indexed repo."""
     payload = request.get_json(silent=True) or {}
     repo_source = (payload.get("repo") or "").strip()
     question = (payload.get("question") or "").strip()

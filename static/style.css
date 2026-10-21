@@ -25,7 +25,6 @@ body {
 
 .app { display: flex; height: 100vh; }
 
-/* ============ SIDEBAR ============ */
 .sidebar {
   width: 330px;
   min-width: 330px;
@@ -96,7 +95,6 @@ select { cursor: pointer; }
 .btn.ghost { background: transparent; color: var(--text-dim); }
 .btn.ghost:hover:not(:disabled) { color: var(--text); }
 
-/* source pills */
 .sources { display: flex; flex-direction: column; gap: 7px; }
 .source {
   display: flex;
@@ -124,6 +122,38 @@ select { cursor: pointer; }
 .slider-field { margin-top: 4px; }
 input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-top: 2px;
+  user-select: none;
+}
+.toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  width: 38px; height: 21px;
+  background: var(--border);
+  border-radius: 21px;
+  position: relative;
+  transition: background 0.18s;
+  flex-shrink: 0;
+}
+.toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 17px; height: 17px;
+  background: #aab2bd;
+  border-radius: 50%;
+  transition: transform 0.18s, background 0.18s;
+}
+.toggle-input:checked + .toggle-track { background: var(--accent); }
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(17px);
+  background: #fff;
+}
+.toggle-label { font-size: 13px; color: var(--text); }
+
 .status, .hint { font-size: 12.5px; line-height: 1.5; }
 .status:empty, .hint:empty { display: none; }
 .status.ok { color: var(--green); }
@@ -136,7 +166,6 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 1
 
 .hidden { display: none !important; }
 
-/* ============ CHAT ============ */
 .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
 .messages { flex: 1; overflow-y: auto; padding: 28px 32px; }

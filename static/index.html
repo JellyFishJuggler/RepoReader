@@ -4,11 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RepoReader — ask anything about a repo</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <div class="app">
-    <!-- ============ SIDEBAR ============ -->
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-icon">📚</span>
@@ -32,13 +31,17 @@
         <h2>Answer with</h2>
         <div id="sources" class="sources"></div>
 
-        <!-- Gemini / Ollama just need a model picker -->
         <div id="modelRow" class="field">
           <label for="model">Model</label>
           <select id="model"></select>
         </div>
 
-        <!-- "My API key" needs all three -->
+        <label class="toggle-row" for="customToggle">
+          <input type="checkbox" id="customToggle" class="toggle-input" />
+          <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Use my own API key</span>
+        </label>
+
         <div id="customFields" class="hidden">
           <div class="field">
             <label for="baseUrl">Base URL</label>
@@ -68,7 +71,6 @@
       <footer class="foot">Same RAG pipeline as the CLI · <code>app/rag.py</code></footer>
     </aside>
 
-    <!-- ============ CHAT ============ -->
     <main class="chat">
       <div id="messages" class="messages">
         <div class="empty" id="emptyState">

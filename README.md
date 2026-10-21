@@ -13,10 +13,9 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 ## Features
 
 - **Any repository** — pass a GitHub URL or a local path.
-- **Four answer sources in the web UI** — pick per question between **Gemini**
-  (key from `.env`), **Ollama** (runs locally, free), **Hugging Face**, or
-  **your own API key** for any OpenAI-compatible endpoint (OpenAI, Groq,
-  OpenRouter, DeepSeek, a local server, …).
+- **Pick your answer source** — **Gemini** (key from `.env`) or **Hugging Face**,
+  or flip the **Use my own API key** toggle to point at any OpenAI-compatible
+  endpoint (OpenAI, Groq, OpenRouter, DeepSeek, a local server, …).
 - **Notebook-aware** — `.ipynb` files are parsed cell-by-cell instead of embedding
   raw JSON garbage (base64 images, cell ids, rendered HTML).
 - **Hallucination guardrail** — the model is instructed to answer *only* from the
@@ -66,7 +65,7 @@ Built with LangChain, Hugging Face embeddings, and the Llama-3.3-70B chat model.
 | `app/chunking.py` | splits documents into overlapping, filename-tagged chunks |
 | `app/vectorstore.py` | local embedding model + in-memory index & retrieval |
 | `app/rag.py` | retrieval + generation glue, guardrail prompt, source attribution |
-| `app/llm.py` | model factories — Gemini, Ollama, HF, any OpenAI-compatible key |
+| `app/llm.py` | model factories - Gemini, HF, any OpenAI-compatible key |
 
 ---
 
@@ -148,11 +147,12 @@ controls how much context reaches the model.
 the model per question:
 
 - **Gemini** — uses `GEMINI_API_KEY` from `.env` (OpenAI-compatible endpoint, no extra dependency).
-- **Ollama** — runs one of your local models for free. `qwen2.5:3b` is the
-  default because it's the smallest and cheapest of the installed models.
 - **Hugging Face** — uses `HUGGINGFACEHUB_API_TOKEN`; needs an account with
   Inference Providers credits.
-- **My API key** — any OpenAI-compatible base URL + model name + key.
+- **Use my own API key** — toggle on, then enter any OpenAI-compatible base
+  URL + model name + key.
+
+> Ollama support exists in `app/llm.py` but is currently commented out.
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -177,7 +177,7 @@ python server.py
 
 | Method | Path | Body | Returns |
 |--------|------|------|---------|
-| `GET`  | `/api/status` | — | which providers are configured + available Ollama models |
+| `GET`  | `/api/status` | - | which providers are configured |
 | `POST` | `/api/index` | `{"repo": "<url or path>"}` | file/chunk counts |
 | `POST` | `/api/ask` | `{"repo", "question", "k", "source", "model", ...}` | `{"answer", "sources", "found"}` |
 
@@ -264,7 +264,7 @@ Sources:
     ├── chunking.py      # chunking + filename tags
     ├── vectorstore.py   # local embedding model + in-memory index & retrieval
     ├── rag.py           # retrieval + generation glue + guardrail prompt
-    └── llm.py           # model factories: Gemini, Ollama, HF, own key
+    └── llm.py           # model factories: Gemini, HF, own key
 ```
 
 ---

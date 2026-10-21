@@ -47,12 +47,7 @@ def load_file(path: Path) -> Document:
 
 
 def extract_notebook_text(path: Path) -> str:
-    """Pull only the meaningful markdown/code cells out of a .ipynb file.
-
-    The raw notebook is JSON littered with ids, execution counts, base64
-    images and rendered HTML outputs. Embedding that is noise; embedding the
-    cell sources is signal.
-    """
+    """Pull only the markdown/code cell sources out of a .ipynb file."""
     with open(path, encoding="utf-8") as f:
         notebook = json.load(f)
 

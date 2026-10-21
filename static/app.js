@@ -1,22 +1,18 @@
-// ============ RepoReader frontend ============
-// Talks to the Flask API in server.py. Keeps the selected source + fields in
-// memory and renders the chat.
-
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  source: "Gemini",       // current answer source
-  ready: false,           // is a repo indexed?
-  repo: "",               // indexed repo source
-  status: {},             // /api/status payload
+  source: "Gemini",
+  custom: false,
+  ready: false,
+  repo: "",
+  status: {},
 };
 
-// Which preset models to offer per source (overridden by live data when we have it).
 const PRESETS = {
   Gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
+  "Hugging Face": ["meta-llama/Llama-3.3-70B-Instruct"],
 };
 
-// ============ boot ============
 document.addEventListener("DOMContentLoaded", async () => {
   renderSources();
   bindEvents();
@@ -27,34 +23,28 @@ async function loadStatus() {
   try {
     const res = await fetch("/api/status");
     state.status = await res.json();
-  } catch (e) {
-    state.status = { error: "Could not reach server." };
+  } catch {
+    state.status = {};
   }
-  // Auto-select the first source that's actually ready.
   const s = state.status;
-  if (s.gemini) state.source = "Gemini";
-  else if (s.ollama_models && s.ollama_models.length) state.source = "Ollama";
-  else state.source = "My API key";
+  state.source = s.gemini ? "Gemini" : "Hugging Face";
   renderSources();
   renderModelPicker();
   updateHint();
 }
 
-// ============ sidebar rendering ============
 function renderSources() {
   const s = state.status;
-  const wrap = $("sources");
   const defs = [
     { name: "Gemini", tag: "cloud", ready: !!s.gemini },
-    { name: "Ollama", tag: "local · free", ready: !!(s.ollama_models && s.ollama_models.length) },
     { name: "Hugging Face", tag: "cloud", ready: !!s.huggingface },
-    { name: "My API key", tag: "any provider", ready: true },
   ];
+  const wrap = $("sources");
   wrap.innerHTML = "";
   for (const d of defs) {
     const el = document.createElement("div");
     el.className = "source" + (d.ready ? " ready" : " disabled") +
-                   (d.name === state.source ? " active" : "");
+                   (d.name === state.source && !state.custom ? " active" : "");
     el.innerHTML = `<span class="dot"></span>
                     <span class="name">${d.name}</span>
                     <span class="tag">${d.tag}</span>`;
@@ -65,63 +55,60 @@ function renderSources() {
 
 function selectSource(name) {
   state.source = name;
+  state.custom = false;
+  $("customToggle").checked = false;
   renderSources();
   renderModelPicker();
   updateHint();
 }
 
 function renderModelPicker() {
-  const isCustom = state.source === "My API key";
-  $("customFields").classList.toggle("hidden", !isCustom);
-  $("modelRow").classList.toggle("hidden", isCustom);
-  if (isCustom) return;
+  $("customFields").classList.toggle("hidden", !state.custom);
+  $("modelRow").classList.toggle("hidden", state.custom);
+  if (state.custom) return;
 
   const sel = $("model");
-  let options = [];
-  if (state.source === "Ollama") options = state.status.ollama_models || [];
-  else if (state.source === "Gemini") options = PRESETS.Gemini;
-  else options = ["meta-llama/Llama-3.3-70B-Instruct"]; // HF default
-
+  const options = PRESETS[state.source] || [];
   sel.innerHTML = "";
   for (const o of options) {
     const opt = document.createElement("option");
-    opt.value = o; opt.textContent = o;
+    opt.value = o;
+    opt.textContent = o;
     sel.appendChild(opt);
   }
-  // Prefer the cheapest Ollama model if present.
-  if (state.source === "Ollama" && options.includes("qwen2.5:3b")) sel.value = "qwen2.5:3b";
 }
 
 function updateHint() {
   const hint = $("sourceHint");
   const s = state.status;
   hint.className = "hint";
-  if (state.source === "Gemini") {
+  if (state.custom) {
+    hint.textContent = "Enter a base URL, model name and key. Works with any OpenAI-compatible API.";
+  } else if (state.source === "Gemini") {
     hint.textContent = s.gemini
       ? "Using GEMINI_API_KEY from your .env."
       : "Add GEMINI_API_KEY=... to .env to use Gemini.";
     if (!s.gemini) hint.className = "hint warn";
-  } else if (state.source === "Ollama") {
-    hint.textContent = (s.ollama_models && s.ollama_models.length)
-      ? "Runs locally — no key, no cost."
-      : "Ollama isn't running. Start it with `ollama serve`.";
-    if (!(s.ollama_models && s.ollama_models.length)) hint.className = "hint warn";
-  } else if (state.source === "Hugging Face") {
+  } else {
     hint.textContent = s.huggingface
       ? "Needs an HF account with Inference Providers credits."
       : "Add HUGGINGFACEHUB_API_TOKEN=... to .env.";
     if (!s.huggingface) hint.className = "hint warn";
-  } else {
-    hint.textContent = "Enter a base URL, model name and key. Works with any OpenAI-compatible API.";
   }
 }
 
-// ============ events ============
 function bindEvents() {
   $("k").oninput = (e) => { $("kVal").textContent = e.target.value; };
   $("loadBtn").onclick = loadRepo;
   $("clearBtn").onclick = clearChat;
   $("askForm").onsubmit = (e) => { e.preventDefault(); ask(); };
+  $("customToggle").onchange = (e) => {
+    state.custom = e.target.checked;
+    renderSources();
+    renderModelPicker();
+    updateHint();
+    if (state.custom) $("customModel").focus();
+  };
 }
 
 async function loadRepo() {
@@ -161,7 +148,6 @@ function showRepoStatus(msg, cls) {
   el.className = "status" + (cls ? " " + cls : "");
 }
 
-// ============ chat ============
 function addMessage(role, text, sources) {
   $("emptyState")?.remove();
   const wrap = $("messages");
@@ -170,8 +156,8 @@ function addMessage(role, text, sources) {
 
   const avatar = role === "user" ? "🧑" : "🤖";
   const who = role === "user" ? "You" : "RepoReader";
-
   const notFound = role === "assistant" && text.startsWith("Not found in repository");
+
   let sourcesHtml = "";
   if (sources && sources.length) {
     sourcesHtml = `<details class="sources-list"><summary>Sources (${sources.length})</summary>
@@ -208,16 +194,15 @@ async function ask() {
   addMessage("user", question);
   $("question").value = "";
   $("askBtn").disabled = true;
-
   const thinking = addThinking();
 
   const body = {
     repo: state.repo,
     question,
     k: parseInt($("k").value, 10),
-    source: state.source,
+    source: state.custom ? "My API key" : state.source,
   };
-  if (state.source === "My API key") {
+  if (state.custom) {
     body.base_url = $("baseUrl").value.trim();
     body.model = $("customModel").value.trim();
     body.api_key = $("apiKey").value.trim();
