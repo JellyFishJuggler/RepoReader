@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RepoReader — ask anything about a repo</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="brand">
         <span class="brand-icon">📚</span>
         <div>
@@ -72,6 +72,13 @@
     </aside>
 
     <main class="chat">
+      <div class="topbar">
+        <button id="sidebarToggle" class="icon-btn" type="button"
+                aria-expanded="true" aria-controls="sidebar"
+                aria-label="Toggle settings">☰</button>
+        <span class="topbar-title">RepoReader</span>
+      </div>
+
       <div id="messages" class="messages">
         <div class="empty" id="emptyState">
           <div class="empty-icon">💬</div>

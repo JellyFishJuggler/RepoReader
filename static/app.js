@@ -154,6 +154,19 @@ function bindEvents() {
     updateHint();
     if (state.custom) $("customModel").focus();
   };
+  $("sidebarToggle").onclick = toggleSidebar;
+}
+
+/** Mobile only: show/hide the settings drawer and keep ARIA in sync. */
+function toggleSidebar() {
+  const app = document.querySelector(".app");
+  const open = app.classList.toggle("drawer-closed");
+  $("sidebarToggle").setAttribute("aria-expanded", String(!open));
+}
+
+function closeSidebar() {
+  document.querySelector(".app").classList.add("drawer-closed");
+  $("sidebarToggle").setAttribute("aria-expanded", "false");
 }
 
 const API_BASE = location.port === "5500" ? "http://127.0.0.1:5000/" : "";
@@ -225,6 +238,8 @@ async function loadRepo() {
     $("askBtn").disabled = false;
     $("question").focus();
     $("emptyState")?.remove();
+    // On mobile, collapse the drawer so the chat gets the screen.
+    if (window.matchMedia("(max-width: 820px)").matches) closeSidebar();
   } catch (e) {
     // A 400 means the server is alive and refused the request; anything else
     // at the transport level means it could not be reached.
@@ -248,9 +263,24 @@ function showRepoStatus(msg, cls) {
   el.className = "status" + (cls ? " " + cls : "");
 }
 
+/** True when the user is close enough to the bottom that auto-scrolling is
+ *  helpful rather than annoying. If they have scrolled up to read, we leave
+ *  them where they are. */
+function isNearBottom(el, slack = 40) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= slack;
+}
+
+/** Scroll the messages container to the bottom, but only if the user had not
+ *  deliberately scrolled away from it. */
+function scrollToLatest(force = false) {
+  const el = $("messages");
+  if (force || isNearBottom(el)) el.scrollTop = el.scrollHeight;
+}
+
 function addMessage(role, text, sources) {
   $("emptyState")?.remove();
   const wrap = $("messages");
+  const stick = isNearBottom(wrap);
   const div = document.createElement("div");
   div.className = "msg " + role;
 
@@ -271,8 +301,23 @@ function addMessage(role, text, sources) {
       ${sourcesHtml}
     </div>`;
   wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
+  wrapTableWrappers(div);
+  // A message the user just sent always scrolls into view; a reply only
+  // follows if they were already reading the latest message.
+  if (role === "user") wrap.scrollTop = wrap.scrollHeight;
+  else if (stick) wrap.scrollTop = wrap.scrollHeight;
   return div;
+}
+
+/** Wrap any tables in the text in a horizontal scroll container. */
+function wrapTableWrappers(root) {
+  root.querySelectorAll(".text table:not(.table-wrap table)").forEach((t) => {
+    if (t.parentElement?.classList.contains("table-wrap")) return;
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
 }
 
 function addThinking() {
@@ -283,7 +328,7 @@ function addThinking() {
     <div class="body"><div class="who">RepoReader</div>
     <div class="thinking">Retrieving and answering<span class="bounce"></span><span class="bounce"></span><span class="bounce"></span></div></div>`;
   wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
+  scrollToLatest(true);
   return div;
 }
 
@@ -329,7 +374,7 @@ function addError(msg) {
   div.className = "err-banner";
   div.textContent = msg;
   wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
+  scrollToLatest(true);
 }
 
 function clearChat() {
