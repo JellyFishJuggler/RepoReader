@@ -106,6 +106,34 @@ def build_custom_model(model: str, api_key: str, base_url: str | None = None):
     return build_chat_model(model, api_key=api_key, base_url=base_url, max_tokens=4096)
 
 
+def resolve_embedding_key(api_key: str | None = None) -> tuple[str, str]:
+    """Resolve which key to embed with, and report where it came from.
+
+    Order: the caller's own key, then the server key outside production, then
+    an error asking for a key when PRODUCTION is on. Returns (key, source).
+    """
+    if api_key:
+        return api_key, "user"
+
+    server_key = get_gemini_key()
+    if server_key and not config.is_production():
+        return server_key, "server"
+
+    raise RuntimeError(
+        "A Gemini API key is required for embeddings. Turn on “Use my own API key” "
+        "and enter your key."
+    )
+
+
+def log_embedding_key(source: str) -> None:
+    """Record which key source an embedding request used. Never logs the key.
+
+    Flushed explicitly: under a non-interactive stdout (Render's log capture)
+    buffered output can sit unflushed and the line would never appear.
+    """
+    print(f"[embeddings] key source: {source}", flush=True)
+
+
 def resolve_model(source: str, model: str | None = None, api_key: str | None = None,
                   base_url: str | None = None):
     """Build a chat model for the chosen answer source.
@@ -147,17 +175,20 @@ def key_status() -> dict:
 
 def log_key_status() -> None:
     """Print which keys were found, without ever printing their values."""
-    print(f"[config] .env path        : {ENV_PATH}")
-    print(f"[config] .env exists      : {ENV_PATH.exists()}")
-    print(f"[config] production       : {config.is_production()}")
-    print(f"[config] embeddings mode  : {config.embeddings_mode()}")
+    print(f"[config] .env path        : {ENV_PATH}", flush=True)
+    print(f"[config] .env exists      : {ENV_PATH.exists()}", flush=True)
+    print(f"[config] production       : {config.is_production()}", flush=True)
+    print(f"[config] embeddings mode  : {config.embeddings_mode()}", flush=True)
     for label, names, getter in (
         ("GEMINI_API_KEY", GEMINI_ENV_NAMES, get_gemini_key),
         ("HUGGINGFACEHUB_API_TOKEN", TOKEN_ENV_NAMES, get_hf_token),
     ):
         value = getter()
         source = next((n for n in names if os.getenv(n)), "-")
-        print(f"[config] {label:<24} loaded: {bool(value)}  (via {source}, len {len(value or '')})")
+        print(
+            f"[config] {label:<24} loaded: {bool(value)}  (via {source}, len {len(value or '')})",
+            flush=True,
+        )
 
 
 @lru_cache(maxsize=1)

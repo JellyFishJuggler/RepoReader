@@ -196,6 +196,7 @@ async function apiFetch(url, options) {
 function userKeyPayload() {
   if (!state.custom) return {};
   return {
+    source: "My API key",
     api_key: $("apiKey").value.trim(),
     base_url: $("baseUrl").value.trim(),
     model: $("customModel").value.trim(),

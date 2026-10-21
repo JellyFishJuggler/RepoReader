@@ -150,29 +150,44 @@ def _get_or_build_store(repo_source: str, api_key: str | None = None):
 
 
 def _payload_key(payload: dict) -> str | None:
-    """Extract the caller's API key without letting it leak elsewhere."""
+    """Extract the caller's API key without letting it leak elsewhere.
+
+    Mirrors /api/ask: the key is only taken when the request says the caller is
+    using their own key, so a stray field cannot silently switch sources.
+    """
+    using_own = bool(payload.get("api_key"))
+    if not using_own:
+        return None
     return (payload.get("api_key") or "").strip() or None
 
 
-def _requires_own_key() -> bool:
-    return config.is_production() and config.embeddings_mode() == "api"
+def _embed_key_or_error(payload: dict) -> tuple[str | None, str | None]:
+    """Resolve the embedding key for a request.
+
+    Returns (key, error_message). The key is None when the caller's own key is
+    needed but missing, which the endpoints report as a 400.
+    """
+    from app.llm import resolve_embedding_key
+
+    try:
+        key, _ = resolve_embedding_key(_payload_key(payload))
+        return key, None
+    except RuntimeError as exc:
+        return None, str(exc)
 
 
 @app.post("/api/index")
 def api_index():
-    """Index a repository. Body: {"repo": "<url or local path>"}."""
+    """Index a repository. Body: {"repo": ..., "api_key": ..., "source": ...}."""
     payload = request.get_json(silent=True) or {}
     repo_source = (payload.get("repo") or "").strip()
-    api_key = _payload_key(payload)
 
     if not repo_source:
         return jsonify(error="Missing 'repo' field."), 400
 
-    if _requires_own_key() and not api_key:
-        return jsonify(
-            error="Indexing needs your own API key. Turn on “Use my own API key” "
-                  "and enter your key first."
-        ), 400
+    api_key, key_error = _embed_key_or_error(payload)
+    if key_error and config.embeddings_mode() == "api":
+        return jsonify(error=key_error), 400
 
     try:
         _validate_repo_source(repo_source)
@@ -208,7 +223,11 @@ def api_ask():
     try:
         store = _stores.get(repo_source)
         if store is None:
-            store, _, _, _ = _get_or_build_store(repo_source, api_key)
+            # Re-indexing embeds with the same resolved key as /api/index.
+            embed_key, key_error = _embed_key_or_error(payload)
+            if key_error and config.embeddings_mode() == "api":
+                return jsonify(error=key_error), 400
+            store, _, _, _ = _get_or_build_store(repo_source, embed_key)
         vector_store = store[0]
     except Exception as exc:
         return jsonify(error=f"Repository is not indexed: {exc}"), 400

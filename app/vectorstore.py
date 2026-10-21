@@ -21,14 +21,18 @@ def _local_embeddings() -> Embeddings:
 def get_embeddings(api_key: str | None = None) -> Embeddings:
     """Return the embedding backend for this request.
 
-    In "api" mode a per-caller object is built from the supplied key, so a
-    deployment never spends the server owner's Gemini quota on visitors.
-    The cache only applies to the local MiniLM model, which needs no key.
+    In "api" mode the key is resolved by app.llm.resolve_embedding_key, which
+    prefers the caller's own key and falls back to the server key outside
+    production. The cache applies only to the keyless local MiniLM model, so no
+    visitor's key is ever retained.
     """
     if config.embeddings_mode() == "api":
         from app.embeddings_api import GeminiEmbeddings
+        from app.llm import log_embedding_key, resolve_embedding_key
 
-        return GeminiEmbeddings(api_key=api_key or "")
+        key, source = resolve_embedding_key(api_key)
+        log_embedding_key(source)
+        return GeminiEmbeddings(api_key=key)
     return _local_embeddings()
 
 
