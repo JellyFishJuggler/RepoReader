@@ -104,8 +104,7 @@ question ──▶ embed query ──▶ retrieve top-k ◀───────
 │   ├── embeddings_api.py   # Gemini embeddings over REST, no torch
 │   ├── rag.py              # retrieval + generation glue, guardrail prompt
 │   └── llm.py              # model factories and key resolution
-├── requirements.txt        # production dependencies (no torch)
-├── requirements-local.txt  # adds sentence-transformers, transformers, torch
+├── requirements.txt        # all dependencies (both embedding backends)
 ├── render.yaml             # Render blueprint
 ├── .python-version         # 3.12 (pinned for Render)
 ├── .env.example            # template — copy to .env and add your keys
@@ -125,8 +124,8 @@ cd RepoReader
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-# Install dependencies — local uses the torch-based MiniLM embeddings
-pip install -r requirements-local.txt
+# Install dependencies (includes the torch-based MiniLM embeddings)
+pip install -r requirements.txt
 ```
 
 Create a `.env` file in the project root. Placeholders only — never commit real keys:
