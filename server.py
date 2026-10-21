@@ -10,7 +10,9 @@ from app.loader import is_remote
 from app.llm import key_status, resolve_model
 from app.rag import NOT_FOUND, ask, build_vectorstore
 
-app = Flask(__name__, static_folder="static", static_url_path="")
+_STATIC_DIR = Path(__file__).parent / "static"
+
+app = Flask(__name__)
 
 _store_lock = Lock()
 _stores: dict[str, tuple] = {}
@@ -25,7 +27,13 @@ def _no_store(response):
 
 @app.get("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return send_from_directory(_STATIC_DIR, "index.html")
+
+
+@app.get("/<path:filename>")
+def static_files(filename: str):
+    """Serve anything in static/ (style.css, app.js, …) with the right MIME type."""
+    return send_from_directory(_STATIC_DIR, filename)
 
 
 @app.get("/api/status")
